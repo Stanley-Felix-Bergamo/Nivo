@@ -3,7 +3,6 @@ import { Header } from "./components/header";
 import { Tabs } from "./components/tabs";
 import { Button } from "./components/ui/button";
 import { Control, Input } from "./components/ui/input";
-// import { Pagination } from "./components/pagination";
 import {
   Table,
   TableBody,
@@ -12,7 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from "./components/ui/table";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { Pagination } from "./components/pagination";
+import { useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import useDebounceValue from "./hooks/use-debounce-value";
 
 export interface TagResponse {
   first: number;
@@ -32,16 +35,26 @@ export interface Tag {
 }
 
 export function App() {
+  const [searchParams] = useSearchParams();
+  const [filter, setFilter] = useState();
+
+  const debouncedFilter = useDebounceValue(filter, 1000);
+
+  const page = searchParams.get("page") ? Number(searchParams.get("page")) : 1;
+
+
+
   const { data: tagsResponse, isLoading } = useQuery<TagResponse>({
-    queryKey: ["get-tags"],
+    queryKey: ["get-tags", debouncedFilter, page],
     queryFn: async () => {
       const response = await fetch(
-        "http://localhost:3333/tags?_page=1&_per_page=10"
+        `http://localhost:3333/tags?_page=${page}&_per_page=10`
       );
       const data = await response.json();
 
       return data;
     },
+    placeholderData: keepPreviousData,
   });
 
   if (isLoading) return null;
@@ -64,7 +77,11 @@ export function App() {
           <div className="flex items-center justify-between">
             <Input variant="filter">
               <Search className="size-3" />
-              <Control placeholder="Search tags..." />
+              <Control
+                placeholder="Search tags..."
+                onChange={(e) => setFilter(e.target.value)}
+                value={filter}
+              />
             </Input>
             <Button>
               <FileDown className="size-3" />
@@ -104,7 +121,13 @@ export function App() {
               })}
             </TableBody>
           </Table>
-          {/* <Pagination pages={0} items={0} page={0} /> */}
+          {tagsResponse && (
+            <Pagination
+              page={tagsResponse.pages}
+              items={tagsResponse.items}
+              pages={page}
+            />
+          )}
         </main>
       </div>
     </>
